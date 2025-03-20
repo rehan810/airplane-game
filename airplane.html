@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Airplane Game</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      background: skyblue;
+    }
+    canvas {
+      display: block;
+    }
+    #refreshButton {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      padding: 10px 20px;
+      background-color: #ff0000;
+      color: #ffffff;
+      border: none;
+      cursor: pointer;
+      font-size: 16px;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="gameCanvas"></canvas>
+  <button id="refreshButton">Refresh</button>
+  <audio id="backgroundMusic" loop>
+    <source src="background-music.mp3" type="audio/mpeg">
+    Your browser does not support the audio element.
+  </audio>
+
+  <script>
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+
+    function resizeCanvas() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    let gameOver = false;
+
+    const airplane = {
+      x: 100,
+      y: canvas.height / 2,
+      width: 60,
+      height: 40,
+      speed: 5,
+      bullets: [],
+      lives: 3,
+      score: 0,
+    };
+
+    const enemies = [];
+    const enemyBullets = [];
+    const keys = {};
+
+    function drawAirplane() {
+      ctx.fillStyle = "red";
+      ctx.fillRect(airplane.x, airplane.y, airplane.width, airplane.height);
+    }
+
+    function drawEnemies() {
+      ctx.fillStyle = "green";
+      enemies.forEach(enemy => {
+        ctx.fillRect(enemy.x, enemy.y, enemy.width, enemy.height);
+      });
+    }
+
+    function drawBullets() {
+      ctx.fillStyle = "yellow";
+      airplane.bullets.forEach(bullet => {
+        ctx.fillRect(bullet.x, bullet.y, bullet.width, bullet.height);
+      });
+
+      ctx.fillStyle = "blue";
+      enemyBullets.forEach(bullet => {
+        ctx.fillRect(bullet.x, bullet.y, bullet.width, bullet.height);
+      });
+    }
+
+    function drawLives() {
+      ctx.fillStyle = "black";
+      ctx.font = "20px Arial";
+      ctx.fillText(`Lives: ${airplane.lives}`, 20, 30);
+    }
+
+    function drawScore() {
+      ctx.fillStyle = "black";
+      ctx.font = "20px Arial";
+      ctx.fillText(`Score: ${airplane.score}`, 20, 60);
+    }
+
+    function drawGameOver() {
+      ctx.fillStyle = "black";
+      ctx.font = "50px Arial";
+      ctx.fillText("Game Over", canvas.width / 2 - 150, canvas.height / 2);
+    }
+
+    function updateAirplane() {
+      if (keys["ArrowUp"] && airplane.y > 0) {
+        airplane.y -= airplane.speed;
+      }
+      if (keys["ArrowDown"] && airplane.y < canvas.height - airplane.height) {
+        airplane.y += airplane.speed;
+      }
+      if (keys["ArrowLeft"] && airplane.x > 0) {
+        airplane.x -= airplane.speed;
+      }
+      if (keys["ArrowRight"] && airplane.x < canvas.width - airplane.width) {
+        airplane.x += airplane.speed;
+      }
+      if (keys[" "] || keys["Spacebar"]) {
+        fireBullet();
+      }
+    }
+
+    function fireBullet() {
+      airplane.bullets.push({
+        x: airplane.x + airplane.width,
+        y: airplane.y + airplane.height / 2 - 2,
+        width: 10,
+        height: 4,
+        speed: 10,
+      });
+    }
+
+    function fireEnemyBullet(enemy) {
+      enemyBullets.push({
+        x: enemy.x - 10,
+        y: enemy.y + enemy.height / 2 - 2,
+        width: 10,
+        height: 4,
+        speed: 5,
+      });
+    }
+
+    function updateBullets() {
+      airplane.bullets.forEach((bullet, index) => {
+        bullet.x += bullet.speed;
+        if (bullet.x > canvas.width) {
+          airplane.bullets.splice(index, 1);
+        }
+      });
+
+      enemyBullets.forEach((bullet, index) => {
+        bullet.x -= bullet.speed;
+        if (bullet.x < 0) {
+          enemyBullets.splice(index, 1);
+        } else if (checkCollision(bullet, airplane)) {
+          enemyBullets.splice(index, 1);
+          airplane.lives -= 1;
+          if (airplane.lives <= 0) {
+            gameOver = true;
+          }
+        }
+      });
+    }
+
+    function updateEnemies() {
+      enemies.forEach((enemy, enemyIndex) => {
+        enemy.x -= enemy.speed;
+        if (Math.random() < 0.01) {
+          fireEnemyBullet(enemy);
+        }
+
+        airplane.bullets.forEach((bullet, bulletIndex) => {
+          if (checkCollision(bullet, enemy)) {
+            airplane.bullets.splice(bulletIndex, 1);
+            enemies.splice(enemyIndex, 1);
+            airplane.score += 1;
+          }
+        });
+      });
+
+      if (Math.random() < 0.02) {
+        enemies.push({
+          x: canvas.width,
+          y: Math.random() * (canvas.height - 40),
+          width: 60,
+          height: 40,
+          speed: 3,
+        });
+      }
+    }
+
+    function checkCollision(rect1, rect2) {
+      return (
+        rect1.x < rect2.x + rect2.width &&
+        rect1.x + rect1.width > rect2.x &&
+        rect1.y < rect2.y + rect2.height &&
+        rect1.y + rect1.height > rect2.y
+      );
+    }
+
+    function gameLoop() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      if (!gameOver) {
+        updateAirplane();
+        updateBullets();
+        updateEnemies();
+        drawAirplane();
+        drawEnemies();
+        drawBullets();
+        drawLives();
+        drawScore();
+      } else {
+        drawGameOver();
+      }
+      requestAnimationFrame(gameLoop);
+    }
+
+    window.addEventListener("keydown", (e) => {
+      keys[e.key] = true;
+      if (e.key === " " || e.key === "Spacebar") {
+        e.preventDefault();
+      }
+    });
+
+    window.addEventListener("keyup", (e) => {
+      keys[e.key] = false;
+      if (e.key === " " || e.key === "Spacebar") {
+        e.preventDefault();
+      }
+    });
+
+    document.getElementById("refreshButton").addEventListener("click", () => {
+      document.location.reload();
+    });
+
+    document.getElementById("backgroundMusic").play();
+    gameLoop();
+  </script>
+</body>
+</html>
